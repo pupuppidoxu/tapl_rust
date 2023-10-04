@@ -54,6 +54,15 @@ where
     delimited(char('{'), ws(inner), char('}'))
 }
 
+pub(super) fn square<'a, F, O, E: ParseError<&'a str>>(
+    inner: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+where
+    F: Parser<&'a str, O, E>,
+{
+    delimited(char('['), ws(inner), char(']'))
+}
+
 pub(super) fn lcid(s: &str) -> IResult<&str, &str> {
     verify(id, |name: &str| {
         name.chars().next().map_or(false, |c| c.is_lowercase())

@@ -7,16 +7,34 @@ use crate::{
 };
 
 pub fn run(s: &str) {
-    let ctx = Context::new();
+    let mut ctx = Context::new();
     match parse(s) {
-        Ok(terms) => terms.into_iter().for_each(|stmt| match stmt {
-            Statement::Eval(t) => {
-                print!("*Parse >> ");
-                printing::print_term(&t, &ctx.to_name_only());
-                print!("  Type >> ");
-                if printing::check_type_while_printing(&t, &ctx) {
-                    print!("  Eval >> ");
-                    println!("_ = {}", t.eval(&ctx).to_string_in(&ctx.to_name_only()))
+        Ok(terms) => terms.into_iter().for_each(|stmt| {
+            let name_ctx = ctx.to_name_only();
+            match stmt {
+                Statement::Eval(t) => {
+                    print!("*Parse >> ");
+                    printing::print_term(&t, &name_ctx);
+                    print!("  Type >> ");
+                    if printing::check_type_while_printing(&t, &ctx) {
+                        print!("  Eval >> ");
+                        println!("_ = {}", t.eval(&ctx).to_string_in(&name_ctx))
+                    }
+                }
+                Statement::TyAbbBind(name, ty) => {
+                    println!(
+                        "*Parse >> typealias {name} = {}",
+                        ty.to_string_in(&name_ctx)
+                    );
+                    print!("  Bind >> ");
+                    match ty.kind_in(&ctx) {
+                        Ok(k) => {
+                            let ty = ty.simplify(&ctx);
+                            println!("{name}::{k} = {}", ty.to_string_in(&name_ctx));
+                            ctx.add(name, Binding::TyAbb(ty, k))
+                        }
+                        Err(e) => println!("!!ERROR!! {e}"),
+                    }
                 }
             }
         }),

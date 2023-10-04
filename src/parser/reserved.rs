@@ -11,6 +11,7 @@ pub(super) enum Reserved {
     False,
     If,
     Else,
+    Typealias,
 
     // uppercase
     #[strum(serialize = "Bool")]
@@ -27,16 +28,20 @@ pub(super) enum Reserved {
     Back,
     #[strum(serialize = "\\\\")]
     BackBack,
-    #[strum(serialize = "#")]
-    Sharp,
     #[strum(serialize = ":")]
     Colon,
+    #[strum(serialize = "::")]
+    ColonColon,
+    #[strum(serialize = "*")]
+    Star,
     #[strum(serialize = ";")]
     Semi,
     #[strum(serialize = "=")]
     Eq,
     #[strum(serialize = "->")]
     Arrow,
+    #[strum(serialize = "=>")]
+    DArrow,
     #[strum(serialize = "//")]
     SlashSlash,
     #[strum(serialize = "++")]

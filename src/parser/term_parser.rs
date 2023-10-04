@@ -8,9 +8,10 @@ use nom::{
 use crate::syntax::{Context, Term};
 
 use super::{
+    kind_parser::opt_kind,
     reserved::Reserved,
     type_parser::type_expression,
-    util::{boolean, curly, lcid, nat, paren, ucid, ws},
+    util::{boolean, curly, lcid, nat, paren, square, ucid, ws},
 };
 
 type Out = Box<dyn FnOnce(&Context<()>) -> Term>;
@@ -53,7 +54,7 @@ fn app_term(s: &str) -> IResult<&str, Out> {
     }
 
     fn term_ty_app(s: &str) -> IResult<&str, Next> {
-        let (s, to_ty2) = preceded(ws(Reserved::Sharp.to_tag()), type_expression)(s)?;
+        let (s, to_ty2) = preceded(multispace0, square(type_expression))(s)?;
         Ok((
             s,
             Box::new(|to_t1| Box::new(|c: &_| Term::TyApp(to_t1(c).boxed(), to_ty2(c)))),
@@ -103,6 +104,7 @@ fn term_atomic(s: &str) -> IResult<&str, Out> {
 
 fn term_ty_abs(s: &str) -> IResult<&str, Out> {
     let (s, name) = preceded(Reserved::BackBack.to_tag(), ucid)(s)?;
+    let (s, k1) = opt_kind(s)?;
     let (s, to_t2) = preceded(ws(Reserved::Dot.to_tag()), term_expression)(s)?;
     let name = name.to_owned();
     Ok((
@@ -110,7 +112,7 @@ fn term_ty_abs(s: &str) -> IResult<&str, Out> {
         Box::new(move |c| {
             let mut inner = c.clone();
             inner.add_name(name.clone());
-            Term::TyAbs(name, to_t2(&inner).boxed())
+            Term::TyAbs(name, k1, to_t2(&inner).boxed())
         }),
     ))
 }

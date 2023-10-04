@@ -1,21 +1,22 @@
-use nom::{branch::alt, sequence::preceded, IResult};
+use nom::{branch::alt, character::complete::multispace0, sequence::preceded, IResult};
 
 use crate::syntax::{Context, Ty};
 
 use super::{
+    kind_parser::opt_kind,
     reserved::Reserved,
-    util::{paren, ucid, ws},
+    util::{paren, square, ucid, ws},
 };
 
 type Out = Box<dyn FnOnce(&Context<()>) -> Ty>;
 
 pub(super) fn type_expression(s: &str) -> IResult<&str, Out> {
-    alt((type_all, type_arr))(s)
+    alt((type_all, type_abs, arr_type))(s)
 }
 
-fn type_arr(s: &str) -> IResult<&str, Out> {
+fn arr_type(s: &str) -> IResult<&str, Out> {
     fn rec(s: &str, to_ty1: Out) -> IResult<&str, Out> {
-        match preceded(ws(Reserved::Arrow.to_tag()), type_atomic)(s) {
+        match preceded(ws(Reserved::Arrow.to_tag()), app_type)(s) {
             Ok((s, to_ty1_next)) => {
                 let (s, to_ty2) = rec(s, to_ty1_next)?;
                 Ok((
@@ -23,6 +24,21 @@ fn type_arr(s: &str) -> IResult<&str, Out> {
                     Box::new(|c| Ty::Arr(to_ty1(c).boxed(), to_ty2(c).boxed())),
                 ))
             }
+            Err(_) => Ok((s, to_ty1)),
+        }
+    }
+
+    let (s, to_ty1) = app_type(s)?;
+    rec(s, to_ty1)
+}
+
+fn app_type(s: &str) -> IResult<&str, Out> {
+    fn rec(s: &str, to_ty1: Out) -> IResult<&str, Out> {
+        match preceded(multispace0, square(type_expression))(s) {
+            Ok((s, to_ty2)) => rec(
+                s,
+                Box::new(|c| Ty::App(to_ty1(c).boxed(), to_ty2(c).boxed())),
+            ),
             Err(_) => Ok((s, to_ty1)),
         }
     }
@@ -62,6 +78,7 @@ fn type_atomic(s: &str) -> IResult<&str, Out> {
 
 fn type_all(s: &str) -> IResult<&str, Out> {
     let (s, name) = preceded(Reserved::At.to_tag(), ucid)(s)?;
+    let (s, k1) = opt_kind(s)?;
     let (s, to_ty2) = preceded(ws(Reserved::Comma.to_tag()), type_expression)(s)?;
     let name = name.to_owned();
     Ok((
@@ -69,7 +86,22 @@ fn type_all(s: &str) -> IResult<&str, Out> {
         Box::new(|c| {
             let mut inner = c.clone();
             inner.add_name(name.clone());
-            Ty::All(name, to_ty2(&inner).boxed())
+            Ty::All(name, k1, to_ty2(&inner).boxed())
+        }),
+    ))
+}
+
+fn type_abs(s: &str) -> IResult<&str, Out> {
+    let (s, name) = preceded(Reserved::BackBack.to_tag(), ucid)(s)?;
+    let (s, k1) = opt_kind(s)?;
+    let (s, to_ty2) = preceded(ws(Reserved::Comma.to_tag()), type_expression)(s)?;
+    let name = name.to_owned();
+    Ok((
+        s,
+        Box::new(|c| {
+            let mut inner = c.clone();
+            inner.add_name(name.clone());
+            Ty::Abs(name, k1, to_ty2(&inner).boxed())
         }),
     ))
 }
